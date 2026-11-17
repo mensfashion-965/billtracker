@@ -1,0 +1,1163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BillTrack — Smart Receipt Scanner & Spending Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        background-color: #faf9fc;
+        color: #1e1035;
+      }
+      .font-mono-tabular {
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+        font-variant-numeric: tabular-nums;
+      }
+    </style>
+  </head>
+  <body class="bg-[#FAF9FC] text-[#1E1035] antialiased selection:bg-[#FEF08A] selection:text-[#2D1654]">
+    <div id="authOverlay" style="display:none" class="fixed inset-0 z-[60] items-center justify-center overflow-y-auto bg-[#22103F] px-4 py-8">
+      <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
+        <p class="text-sm font-bold tracking-tight text-[#5B21B6]">BillTrack</p>
+        <h1 id="authTitle" class="mt-1 text-2xl font-bold text-[#22103F]">Sign in to BillTrack</h1>
+        <p id="authSub" class="mt-2 text-sm text-[#6B5B8C]">Enter your email and we will send you a 6-digit sign-in code.</p>
+
+        <form id="authEmailForm" class="mt-6" novalidate>
+          <label for="authEmail" class="mb-1.5 block text-sm font-semibold text-[#22103F]">Email address</label>
+          <input id="authEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com"
+            class="min-h-[44px] w-full rounded-lg border border-[#DDD6FE] px-3 py-2 text-sm outline-none focus:border-[#5B21B6] focus:ring-2 focus:ring-[#DDD6FE]" />
+          <button id="authSendBtn" type="submit"
+            class="mt-4 min-h-[44px] w-full rounded-lg bg-[#5B21B6] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4C1D95] disabled:opacity-60">
+            Send sign-in code
+          </button>
+        </form>
+
+        <form id="authCodeForm" style="display:none" class="mt-6" novalidate>
+          <label for="authCode" class="mb-1.5 block text-sm font-semibold text-[#22103F]">6-digit code</label>
+          <input id="authCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"
+            class="font-mono-tabular min-h-[44px] w-full rounded-lg border border-[#DDD6FE] px-3 py-2 text-center text-xl tracking-[0.4em] outline-none focus:border-[#5B21B6] focus:ring-2 focus:ring-[#DDD6FE]" />
+          <button id="authVerifyBtn" type="submit"
+            class="mt-4 min-h-[44px] w-full rounded-lg bg-[#5B21B6] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4C1D95] disabled:opacity-60">
+            Verify &amp; sign in
+          </button>
+          <div class="mt-3 flex items-center justify-between text-sm">
+            <button id="authBackBtn" type="button" class="font-medium text-[#5B21B6] hover:underline">Change email</button>
+            <button id="authResendBtn" type="button" class="font-medium text-[#5B21B6] hover:underline disabled:text-[#9CA3AF] disabled:no-underline">Resend code</button>
+          </div>
+        </form>
+
+        <p id="authMsg" class="mt-4 hidden rounded-lg px-3 py-2 text-sm"></p>
+        <p class="mt-6 text-xs text-[#8B7BAA]">Your bills are private to your email. Use the same email next time to see them again.</p>
+      </div>
+    </div>
+    <header class="sticky top-0 z-30 border-b border-[#381C66] bg-[#22103F]">
+      <div class="mx-auto flex max-w-6xl items-center justify-between gap-8 px-4 py-3.5 sm:px-6">
+        <a href="#scanner" class="text-lg font-bold tracking-tight text-white whitespace-nowrap shrink-0">
+          BillTrack
+        </a>
+        <nav class="hidden items-center gap-6 text-sm font-medium text-[#DDD6FE] md:flex">
+          <a href="#scanner" class="transition-colors hover:text-[#FACC15] hover:underline underline-offset-4 whitespace-nowrap shrink-0">Scanner</a>
+          <a href="#dashboard" class="transition-colors hover:text-[#FACC15] hover:underline underline-offset-4 whitespace-nowrap shrink-0">Dashboard</a>
+          <a href="#history" class="transition-colors hover:text-[#FACC15] hover:underline underline-offset-4 whitespace-nowrap shrink-0">Saved Bills</a>
+          <a href="#workflow" class="transition-colors hover:text-[#FACC15] hover:underline underline-offset-4 whitespace-nowrap shrink-0">How It Works</a>
+        </nav>
+        <div class="flex items-center gap-3">
+          <span id="userEmail" class="hidden max-w-[200px] truncate text-xs text-[#DDD6FE] sm:inline"></span>
+          <button id="signOutBtn" type="button" class="inline-flex min-h-[40px] items-center rounded-lg border border-[#5B3A99] px-3 py-2 text-xs font-semibold text-[#DDD6FE] transition-colors hover:bg-[#381C66] whitespace-nowrap shrink-0">Sign out</button>
+        <button
+          id="navUploadBtn"
+          type="button"
+          class="inline-flex min-h-[40px] items-center rounded-lg bg-[#FACC15] px-4 py-2 text-xs font-bold text-[#22103F] transition-colors hover:bg-[#EAB308] whitespace-nowrap shrink-0"
+        >
+          Upload Bill
+        </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-6xl space-y-12 px-4 py-8 sm:px-6 sm:py-10">
+      <section id="scanner" class="scroll-mt-20">
+        <div class="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 class="text-2xl font-bold tracking-tight text-[#1E1035] sm:text-3xl">
+              Scan a bill, record the reason, never lose a receipt.
+            </h1>
+            <p class="mt-1.5 max-w-2xl text-sm text-[#5B526E]">
+              Capture with your camera or upload from your gallery. All scanned details and photos are saved directly to your Google Sheet &amp; Google Drive.
+            </p>
+          </div>
+          <button
+            id="resetBtn"
+            type="button"
+            class="hidden inline-flex min-h-[40px] items-center gap-2 self-start rounded-lg border border-[#D8CEF0] bg-white px-4 py-2 text-sm font-medium text-[#3B2863] transition-colors hover:bg-[#F5F2FC] whitespace-nowrap shrink-0"
+          >
+            Clear &amp; Scan New
+          </button>
+        </div>
+
+        <input id="fileInput" type="file" accept="image/*" class="hidden" aria-label="Upload bill photo from gallery" />
+        <input id="nativeCameraInput" type="file" accept="image/*" capture="environment" class="hidden" aria-label="Capture bill photo with device camera" />
+
+        <div
+          id="savedNotice"
+          role="status"
+          class="hidden mb-5 flex items-center justify-between gap-3 rounded-xl border border-[#16A34A]/30 bg-[#F0FDF4] px-4 py-3 text-sm text-[#166534]"
+        >
+          <span id="savedNoticeText" class="font-medium"></span>
+          <button id="dismissNoticeBtn" type="button" class="text-xs font-semibold underline">Dismiss</button>
+        </div>
+
+        <div class="grid items-stretch gap-6 lg:grid-cols-12">
+          <div class="flex flex-col rounded-xl border border-[#E6DFF3] bg-white p-5 lg:col-span-5">
+            <div class="mb-4 flex items-center justify-between">
+              <h2 class="text-sm font-semibold text-[#1E1035]">1. Receipt Photo</h2>
+              <span class="text-xs text-[#5B526E]">Camera or Gallery</span>
+            </div>
+
+            <div
+              id="dropZone"
+              class="flex flex-1 flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#D8CEF0] bg-[#FAF9FC] p-6 text-center transition-colors hover:border-[#7C3AED]"
+            >
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-[#EDE8F8] text-[#5B21B6] font-bold">
+                OCR
+              </div>
+              <p class="mt-4 text-sm font-semibold text-[#1E1035]">Drop your bill photo here</p>
+              <p class="mt-1 max-w-xs text-xs leading-relaxed text-[#5B526E]">
+                Supports JPG, PNG, and mobile receipt photos. Scanning begins automatically upon upload.
+              </p>
+
+              <div class="mt-6 flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
+                <button
+                  id="openCameraBtn"
+                  type="button"
+                  class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-[#5B21B6] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#4C1D95] whitespace-nowrap shrink-0"
+                >
+                  Use Camera
+                </button>
+                <button
+                  id="chooseGalleryBtn"
+                  type="button"
+                  class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-[#FACC15] px-5 py-2.5 text-sm font-semibold text-[#22103F] transition-colors hover:bg-[#EAB308] whitespace-nowrap shrink-0"
+                >
+                  From Gallery
+                </button>
+              </div>
+            </div>
+
+            <div id="previewContainer" class="hidden flex-1 flex-col gap-4">
+              <div class="relative flex min-h-[300px] flex-1 items-center justify-center overflow-hidden rounded-xl border border-[#E6DFF3] bg-[#180B2E]">
+                <img id="previewImg" alt="Uploaded bill preview" class="max-h-[380px] w-full object-contain" />
+                <div
+                  id="scanningOverlay"
+                  class="hidden absolute inset-0 flex-col items-center justify-center gap-2 bg-[#180B2E]/80 px-4 text-center"
+                >
+                  <div class="h-8 w-8 animate-spin rounded-full border-4 border-[#FACC15] border-t-transparent"></div>
+                  <p class="text-sm font-semibold text-white">Scanning receipt...</p>
+                  <p class="text-xs text-[#DDD6FE]">Reading shop name, bill date, and grand total</p>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2.5">
+                <button
+                  id="retakePhotoBtn"
+                  type="button"
+                  class="inline-flex min-h-[40px] flex-1 items-center justify-center gap-2 rounded-lg border border-[#D8CEF0] bg-white px-4 py-2 text-xs font-semibold text-[#3B2863] hover:bg-[#F5F2FC]"
+                >
+                  Retake Photo
+                </button>
+                <button
+                  id="chooseAnotherBtn"
+                  type="button"
+                  class="inline-flex min-h-[40px] flex-1 items-center justify-center gap-2 rounded-lg border border-[#D8CEF0] bg-white px-4 py-2 text-xs font-semibold text-[#3B2863] hover:bg-[#F5F2FC]"
+                >
+                  Choose Another
+                </button>
+              </div>
+            </div>
+
+            <div
+              id="scanErrorBox"
+              role="alert"
+              class="hidden mt-4 flex items-center justify-between gap-3 rounded-lg border border-[#DC2626]/30 bg-[#FEF2F2] px-3.5 py-2.5 text-xs text-[#991B1B]"
+            >
+              <span id="scanErrorText"></span>
+              <button id="retryScanBtn" type="button" class="font-semibold underline shrink-0">Retry Scan</button>
+            </div>
+          </div>
+
+          <form id="billForm" class="flex flex-col justify-between rounded-xl border border-[#E6DFF3] bg-white p-5 lg:col-span-7">
+            <div>
+              <div class="mb-5 flex flex-wrap items-center justify-between gap-2 border-b border-[#EDE8F8] pb-3.5">
+                <div>
+                  <h2 class="text-sm font-semibold text-[#1E1035]">2. Auto-Scanned Details &amp; Spending Reason</h2>
+                  <p id="scanStatusText" class="mt-0.5 text-xs text-[#5B526E]">
+                    Upload or capture a bill photo to auto-fill all 4 receipt fields
+                  </p>
+                </div>
+              </div>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label for="shopName" class="block text-xs font-semibold text-[#3B2863]">Shop / Company Name</label>
+                  <input
+                    id="shopName"
+                    type="text"
+                    placeholder="e.g. Reliance Smart / ABC Traders"
+                    class="mt-1.5 min-h-[42px] w-full rounded-lg border border-[#D8CEF0] bg-[#FAF9FC] px-3.5 py-2 text-sm font-medium text-[#1E1035] focus:border-[#5B21B6] focus:bg-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between gap-2">
+                    <label for="billDate" class="block text-xs font-semibold text-[#3B2863]">Bill Date (Purchase Date)</label>
+                    <span id="rawDateBadge" class="hidden font-mono-tabular text-[11px] text-[#5B526E]"></span>
+                  </div>
+                  <input
+                    id="billDate"
+                    type="date"
+                    class="font-mono-tabular mt-1.5 min-h-[42px] w-full rounded-lg border border-[#D8CEF0] bg-[#FAF9FC] px-3.5 py-2 text-sm font-medium text-[#1E1035] focus:border-[#5B21B6] focus:bg-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label for="uploadedDate" class="block text-xs font-semibold text-[#3B2863]">Uploaded Date</label>
+                  <input
+                    id="uploadedDate"
+                    type="date"
+                    class="font-mono-tabular mt-1.5 min-h-[42px] w-full rounded-lg border border-[#D8CEF0] bg-[#F5F2FC] px-3.5 py-2 text-sm font-medium text-[#4C1D95] focus:border-[#5B21B6] focus:bg-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label for="totalAmount" class="block text-xs font-semibold text-[#3B2863]">Total Amount</label>
+                  <div class="mt-1.5 flex overflow-hidden rounded-lg border border-[#D8CEF0] bg-[#FAF9FC] focus-within:border-[#5B21B6] focus-within:bg-white">
+                    <select
+                      id="currency"
+                      aria-label="Currency"
+                      class="border-r border-[#D8CEF0] bg-[#EDE8F8] px-3 py-2 text-sm font-semibold text-[#3B2863] focus:outline-none"
+                    >
+                      <option value="₹">₹</option>
+                      <option value="$">$</option>
+                      <option value="€">€</option>
+                      <option value="£">£</option>
+                    </select>
+                    <input
+                      id="totalAmount"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      class="font-mono-tabular min-h-[42px] w-full bg-transparent px-3.5 py-2 text-base font-bold text-[#4C1D95] focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-5 rounded-xl border border-[#EAB308]/50 bg-[#FEFCE8] p-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <label for="spendingReason" class="text-sm font-bold text-[#22103F]">Spending Reason</label>
+                  <span class="text-xs text-[#713F12]">Required before saving to Google Sheet</span>
+                </div>
+
+                <textarea
+                  id="spendingReason"
+                  rows="2"
+                  placeholder="Type why you spent this amount (e.g. Monthly groceries, Client lunch, Printer paper)..."
+                  class="mt-2 w-full rounded-lg border border-[#EAB308]/60 bg-white px-3.5 py-2.5 text-sm text-[#1E1035] focus:border-[#5B21B6] focus:outline-none"
+                ></textarea>
+
+                <div id="quickReasons" class="mt-2.5 flex flex-wrap items-center gap-1.5">
+                  <button
+                    id="suggestedReasonBtn"
+                    type="button"
+                    class="hidden rounded-md border border-[#5B21B6]/30 bg-[#EDE8F8] px-2.5 py-1 text-xs font-semibold text-[#4C1D95] hover:bg-[#DDD6FE]"
+                  ></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-5 flex flex-col gap-3 border-t border-[#EDE8F8] pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <div class="min-h-[20px] text-xs">
+                <span id="saveErrorText" class="hidden font-medium text-[#DC2626]"></span>
+                <span id="saveHelperText" class="text-[#5B526E]">Saves receipt photo, dates, amount, and reason to Google Sheets.</span>
+              </div>
+
+              <button
+                id="submitBtn"
+                type="submit"
+                class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-[#5B21B6] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#4C1D95] disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap shrink-0"
+              >
+                Submit &amp; Save Bill
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <div class="border-t border-[#E6DFF3]"></div>
+
+      <section id="dashboard" class="scroll-mt-20 space-y-6">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 class="text-xl font-bold tracking-tight text-[#1E1035]">Spending Reason Dashboard</h2>
+            <p class="mt-1 text-sm text-[#5B526E]">Every scanned receipt saved in your Google Sheet, organized by spending reason.</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button
+              id="refreshBillsBtn"
+              type="button"
+              class="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#D8CEF0] bg-white px-4 py-2 text-xs font-semibold text-[#3B2863] hover:bg-[#F5F2FC]"
+            >
+              Refresh Sheet
+            </button>
+            <button
+              id="exportCsvBtn"
+              type="button"
+              class="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#D8CEF0] bg-white px-4 py-2 text-xs font-semibold text-[#3B2863] hover:bg-[#F5F2FC] disabled:opacity-50"
+            >
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="rounded-xl border border-[#E6DFF3] bg-white p-4">
+            <p class="text-xs font-medium text-[#5B526E]">Total Tracked Spend</p>
+            <p id="kpiTotal" class="font-mono-tabular mt-1.5 text-2xl font-bold text-[#4C1D95]">₹0.00</p>
+          </div>
+          <div class="rounded-xl border border-[#E6DFF3] bg-white p-4">
+            <p class="text-xs font-medium text-[#5B526E]">Bills Saved</p>
+            <p id="kpiCount" class="font-mono-tabular mt-1.5 text-2xl font-bold text-[#1E1035]">0</p>
+          </div>
+          <div class="rounded-xl border border-[#E6DFF3] bg-white p-4">
+            <p class="text-xs font-medium text-[#5B526E]">Average Per Bill</p>
+            <p id="kpiAvg" class="font-mono-tabular mt-1.5 text-2xl font-bold text-[#1E1035]">₹0.00</p>
+          </div>
+          <div class="rounded-xl border border-[#EAB308]/40 bg-[#FEFCE8] p-4">
+            <p class="text-xs font-medium text-[#713F12]">Latest Upload Date</p>
+            <p id="kpiLatest" class="font-mono-tabular mt-1.5 text-2xl font-bold text-[#22103F]">—</p>
+          </div>
+        </div>
+
+        <div id="breakdownCard" class="hidden rounded-xl border border-[#E6DFF3] bg-white p-5">
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 class="text-sm font-semibold text-[#1E1035]">Spend by Reason</h3>
+              <p class="text-xs text-[#5B526E]">Click any spending reason bar to filter the saved bills ledger below.</p>
+            </div>
+            <button
+              id="clearFilterBtn"
+              type="button"
+              class="hidden rounded-md bg-[#EDE8F8] px-2.5 py-1 text-xs font-semibold text-[#4C1D95] hover:bg-[#DDD6FE]"
+            >
+              Clear reason filter
+            </button>
+          </div>
+          <div id="reasonBreakdownGrid" class="grid gap-3 md:grid-cols-2"></div>
+        </div>
+
+        <div id="history" class="scroll-mt-20 rounded-xl border border-[#E6DFF3] bg-white">
+          <div class="flex flex-col gap-3 border-b border-[#EDE8F8] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-semibold text-[#1E1035]">Saved Bills Ledger</h3>
+              <span id="shownCount" class="text-xs text-[#5B526E]">· 0 shown</span>
+            </div>
+            <input
+              id="searchInput"
+              type="search"
+              placeholder="Search shop, reason, or date..."
+              class="min-h-[40px] w-full rounded-lg border border-[#D8CEF0] bg-[#FAF9FC] px-3.5 py-2 text-sm text-[#1E1035] focus:border-[#5B21B6] focus:bg-white focus:outline-none sm:max-w-xs"
+            />
+          </div>
+          <div id="ledgerBody"></div>
+        </div>
+      </section>
+
+      <div class="border-t border-[#E6DFF3]"></div>
+
+      <section id="workflow" class="scroll-mt-20">
+        <h2 class="text-lg font-bold text-[#1E1035]">How BillTrack Works</h2>
+        <div class="mt-4 grid gap-4 md:grid-cols-3">
+          <div class="rounded-xl border border-[#E6DFF3] bg-white p-5">
+            <p class="font-mono-tabular text-xs font-semibold text-[#5B21B6]">01. Capture or Upload</p>
+            <h3 class="mt-1.5 text-sm font-semibold text-[#1E1035]">Camera or Gallery Photo</h3>
+            <p class="mt-1 text-xs leading-relaxed text-[#5B526E]">Take a crisp photo of any paper receipt using live camera or device camera, or pick an existing image from your gallery.</p>
+          </div>
+          <div class="rounded-xl border border-[#E6DFF3] bg-white p-5">
+            <p class="font-mono-tabular text-xs font-semibold text-[#5B21B6]">02. Smart Vision Scan</p>
+            <h3 class="mt-1.5 text-sm font-semibold text-[#1E1035]">Accurate Field Extraction</h3>
+            <p class="mt-1 text-xs leading-relaxed text-[#5B526E]">Short-side resolution optimization keeps narrow receipt text readable while auto-populating Shop Name, Bill Date, and Total Amount.</p>
+          </div>
+          <div class="rounded-xl border border-[#EAB308]/40 bg-[#FEFCE8] p-5">
+            <p class="font-mono-tabular text-xs font-semibold text-[#713F12]">03. Save to Google Sheet</p>
+            <h3 class="mt-1.5 text-sm font-semibold text-[#22103F]">Google Sheet + Drive</h3>
+            <p class="mt-1 text-xs leading-relaxed text-[#713F12]">Type why you spent the amount, submit, and inspect all records anytime in your Google Sheet &amp; Dashboard.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="mt-12 border-t border-[#E6DFF3] bg-white">
+      <div class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-6 text-xs text-[#5B526E] sm:flex-row sm:px-6">
+        <span>BillTrack · Standalone HTML Edition</span>
+        <span>Connected to Google Sheets &amp; Google Drive via Apps Script</span>
+      </div>
+    </footer>
+
+    <div id="cameraModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-[#180B2E]/75 p-4" role="dialog" aria-modal="true">
+      <div class="w-full max-w-xl overflow-hidden rounded-xl border border-[#D8CEF0] bg-white shadow-xl">
+        <div class="flex items-center justify-between border-b border-[#EDE8F8] px-5 py-4">
+          <div>
+            <h2 class="text-base font-semibold text-[#1E1035]">Capture Bill Photo</h2>
+            <p class="text-xs text-[#5B526E]">Hold the receipt flat and well-lit so shop name, date, and total are sharp.</p>
+          </div>
+          <button id="closeCameraBtn" type="button" class="rounded-lg px-3 py-1.5 text-sm font-semibold text-[#5B526E] hover:bg-[#F5F2FC]">Close</button>
+        </div>
+        <div class="bg-[#140928] p-4">
+          <video id="cameraVideo" autoplay playsinline muted class="aspect-[4/3] w-full rounded-lg bg-black object-cover"></video>
+          <p id="cameraErrorText" class="hidden mt-3 text-center text-xs text-[#FCA5A5]"></p>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2.5 border-t border-[#EDE8F8] px-5 py-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="switchCameraBtn" type="button" class="min-h-[40px] rounded-lg border border-[#D8CEF0] px-3.5 py-2 text-xs font-semibold text-[#3B2863] hover:bg-[#F5F2FC]">
+              Switch Camera
+            </button>
+            <button id="deviceCameraBtn" type="button" class="min-h-[40px] rounded-lg border border-[#D8CEF0] bg-[#FAF9FC] px-3.5 py-2 text-xs font-semibold text-[#3B2863] hover:bg-[#F5F2FC]">
+              Device Camera
+            </button>
+          </div>
+          <div class="flex items-center gap-2.5">
+            <button id="cancelCameraBtn" type="button" class="min-h-[40px] rounded-lg px-4 py-2 text-sm font-medium text-[#5B526E] hover:bg-[#F5F2FC]">Cancel</button>
+            <button id="snapCameraBtn" type="button" class="min-h-[40px] rounded-lg bg-[#5B21B6] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4C1D95] disabled:opacity-50">
+              Capture &amp; Scan
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="previewModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-[#180B2E]/75 p-4" role="dialog" aria-modal="true">
+      <div class="w-full max-w-2xl overflow-hidden rounded-xl border border-[#D8CEF0] bg-white shadow-xl">
+        <div class="flex items-center justify-between border-b border-[#EDE8F8] px-5 py-4">
+          <div class="min-w-0">
+            <h2 id="modalShopName" class="truncate text-base font-semibold text-[#1E1035]"></h2>
+            <p id="modalDates" class="mt-0.5 font-mono-tabular text-xs text-[#5B526E]"></p>
+          </div>
+          <button id="closePreviewBtn" type="button" class="rounded-lg px-3 py-1.5 text-sm font-semibold text-[#5B526E] hover:bg-[#F5F2FC]">Close</button>
+        </div>
+        <div class="grid gap-5 p-5 md:grid-cols-12">
+          <div class="md:col-span-7">
+            <div class="overflow-hidden rounded-lg border border-[#E9E2F5] bg-[#FAF9FC]">
+              <img id="modalImage" alt="Receipt" referrerpolicy="no-referrer" class="max-h-[420px] w-full object-contain" />
+            </div>
+          </div>
+          <div class="flex flex-col justify-between gap-4 md:col-span-5">
+            <div class="space-y-4">
+              <div>
+                <p class="text-xs font-medium text-[#5B526E]">Total Amount</p>
+                <p id="modalAmount" class="mt-1 font-mono-tabular text-2xl font-bold text-[#4C1D95]"></p>
+              </div>
+              <div class="border-t border-[#EDE8F8] pt-3">
+                <p class="text-xs font-medium text-[#5B526E]">Shop / Company</p>
+                <p id="modalShopCopy" class="mt-1 text-sm font-semibold text-[#1E1035]"></p>
+              </div>
+              <div class="border-t border-[#EDE8F8] pt-3">
+                <p class="text-xs font-medium text-[#5B526E]">Spending Reason</p>
+                <p id="modalReason" class="mt-1 rounded-lg border border-[#EAB308]/40 bg-[#FEFCE8] px-3 py-2 text-sm font-medium text-[#3B2863]"></p>
+              </div>
+            </div>
+            <button id="donePreviewBtn" type="button" class="min-h-[40px] w-full rounded-lg bg-[#5B21B6] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4C1D95]">
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const APPS_SCRIPT_URL =
+          'https://script.google.com/macros/s/AKfycbz_1m9gOM78d866wH1L1LxifkSUsw8iG6kNWYcNX1ynKJPAvzUtK8WqkcM8dfjkrGReYA/exec';
+
+        const QUICK_REASONS = ['Groceries', 'Dining & Food', 'Travel & Fuel', 'Medical', 'Utilities', 'Office Supplies'];
+
+        const state = {
+          bills: [],
+          isLoading: true,
+          loadError: null,
+          searchQuery: '',
+          selectedReasonFilter: 'ALL',
+          previewUrl: null,
+          imageMimeType: 'image/jpeg',
+          isScanning: false,
+          editingId: null,
+          confirmDeleteId: null,
+          cameraStream: null,
+          facingMode: 'environment',
+        };
+
+        const el = (id) => document.getElementById(id);
+
+        const SESSION_KEY = 'billtrack_session_v1';
+        function readSession() {
+          try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (e) { return null; }
+        }
+        function saveSession(v) {
+          try { if (v) localStorage.setItem(SESSION_KEY, JSON.stringify(v)); else localStorage.removeItem(SESSION_KEY); } catch (e) {}
+        }
+        let session = readSession();
+        if (session && session.expiresAt && Date.now() > session.expiresAt) { saveSession(null); session = null; }
+        function forceSignOut() { saveSession(null); location.reload(); }
+
+        function todayString() {
+          const d = new Date();
+          return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+
+        function normalizeDateToISO(val) {
+          if (!val) return '';
+          const s = String(val).trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+          const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+          if (m) {
+            let first = Number(m[1]), second = Number(m[2]), year = m[3];
+            if (year.length === 2) year = Number(year) >= 70 ? '19' + year : '20' + year;
+            let day = first, month = second;
+            if (second > 12 && first <= 12) { month = first; day = second; }
+            if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+              return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+            }
+          }
+          const parsed = new Date(s);
+          return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 10);
+        }
+
+        function normalizeAmount(val) {
+          if (val === null || val === undefined) return '';
+          const cleaned = String(val).replace(/[^0-9.]/g, '');
+          const num = parseFloat(cleaned);
+          return Number.isFinite(num) ? num.toFixed(2) : '';
+        }
+
+        function normalizeCurrency(val) {
+          const s = String(val || '').trim().toUpperCase();
+          if (s.includes('USD') || s.includes('$')) return '$';
+          if (s.includes('EUR') || s.includes('€')) return '€';
+          if (s.includes('GBP') || s.includes('£')) return '£';
+          return '₹';
+        }
+
+        function formatMoney(amount, currency) {
+          return (currency || '₹') + Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function escapeHtml(str) {
+          return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        async function callAppsScriptGet(action) {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 20000);
+          try {
+            const res = await fetch(APPS_SCRIPT_URL + '?action=' + encodeURIComponent(action), { method: 'GET', signal: controller.signal });
+            const text = await res.text();
+            let data;
+            try { data = JSON.parse(text); } catch (e) { throw new Error('Apps Script returned an invalid response. Ensure deployment access is set to Anyone.'); }
+            if (!res.ok || data.error) throw new Error(data.error || 'Apps Script request failed.');
+            return data;
+          } finally {
+            clearTimeout(timer);
+          }
+        }
+
+        async function callAppsScriptPost(payload, timeoutMs) {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), timeoutMs || 25000);
+          try {
+            const res = await fetch(APPS_SCRIPT_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify(Object.assign({ token: session ? session.token : '' }, payload)),
+              signal: controller.signal,
+            });
+            const text = await res.text();
+            let data;
+            try { data = JSON.parse(text); } catch (e) { throw new Error('Apps Script returned an invalid response. Ensure deployment access is set to Anyone.'); }
+            if (data.code === 'AUTH') { forceSignOut(); throw new Error(data.error || 'Please sign in again.'); }
+            if (!res.ok || data.error) throw new Error(data.error || 'Apps Script request failed.');
+            return data;
+          } catch (err) {
+            if (err && err.name === 'AbortError') throw new Error('Request timed out after ' + Math.round((timeoutMs || 25000) / 1000) + 's. Please try again.');
+            throw err;
+          } finally {
+            clearTimeout(timer);
+          }
+        }
+
+        function optimizeImage(source, maxLong, maxShort, quality) {
+          maxLong = maxLong || 2200; maxShort = maxShort || 1150; quality = quality || 0.8;
+          return new Promise((resolve, reject) => {
+            let objectUrl = null;
+            const img = new Image();
+            const cleanup = () => { if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; } };
+            img.onload = () => {
+              const w0 = img.naturalWidth || img.width;
+              const h0 = img.naturalHeight || img.height;
+              const shortSide = Math.min(w0, h0);
+              const longSide = Math.max(w0, h0);
+              let scale = 1;
+              if (shortSide > maxShort) scale = maxShort / shortSide;
+              if (longSide * scale > maxLong) scale = maxLong / longSide;
+              const w = Math.max(1, Math.round(w0 * scale));
+              const h = Math.max(1, Math.round(h0 * scale));
+              const canvas = document.createElement('canvas');
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) { cleanup(); return resolve({ dataUrl: typeof source === 'string' ? source : '', mimeType: 'image/jpeg' }); }
+              ctx.fillStyle = '#FFFFFF';
+              ctx.fillRect(0, 0, w, h);
+              if ('filter' in ctx) ctx.filter = 'contrast(1.08) brightness(1.02)';
+              ctx.drawImage(img, 0, 0, w, h);
+              const dataUrl = canvas.toDataURL('image/jpeg', quality);
+              cleanup();
+              resolve({ dataUrl, mimeType: 'image/jpeg' });
+            };
+            img.onerror = () => {
+              cleanup();
+              reject(new Error('Unsupported or unreadable image format. Use Camera or choose JPG/PNG.'));
+            };
+            if (typeof source === 'string') { img.src = source; }
+            else { objectUrl = URL.createObjectURL(source); img.src = objectUrl; }
+          });
+        }
+
+        function renderQuickReasons(suggested) {
+          const container = el('quickReasons');
+          const suggestedBtn = el('suggestedReasonBtn');
+          Array.from(container.querySelectorAll('.quick-chip')).forEach((n) => n.remove());
+          if (suggested) {
+            suggestedBtn.textContent = 'Use scanned suggestion: ' + suggested;
+            suggestedBtn.classList.remove('hidden');
+            suggestedBtn.onclick = () => { el('spendingReason').value = suggested; renderQuickReasons(suggested); };
+          } else {
+            suggestedBtn.classList.add('hidden');
+          }
+          const current = el('spendingReason').value;
+          QUICK_REASONS.forEach((reason) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = reason;
+            btn.className = 'quick-chip rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ' +
+              (current === reason ? 'border-[#5B21B6] bg-[#5B21B6] text-white' : 'border-[#EAB308]/40 bg-white text-[#422006] hover:bg-[#FEF08A]');
+            btn.onclick = () => { el('spendingReason').value = reason; renderQuickReasons(suggested); };
+            container.appendChild(btn);
+          });
+        }
+
+        async function processAndScan(source) {
+          el('scanErrorBox').classList.add('hidden');
+          el('saveErrorText').classList.add('hidden');
+          el('saveHelperText').classList.remove('hidden');
+          el('savedNotice').classList.add('hidden');
+          el('uploadedDate').value = todayString();
+          state.isScanning = true;
+          el('submitBtn').disabled = true;
+          el('scanStatusText').textContent = 'Optimizing receipt and extracting fields...';
+
+          try {
+            const opt = await optimizeImage(source);
+            const small = await optimizeImage(source, 1100, 800, 0.7);
+            state.previewUrl = opt.dataUrl;
+            state.imageMimeType = opt.mimeType;
+            el('dropZone').classList.add('hidden');
+            el('previewContainer').classList.remove('hidden');
+            el('previewContainer').classList.add('flex');
+            el('resetBtn').classList.remove('hidden');
+            el('previewImg').src = opt.dataUrl;
+            el('scanningOverlay').classList.remove('hidden');
+            el('scanningOverlay').classList.add('flex');
+
+            const data = await callAppsScriptPost({
+              action: 'scanBill',
+              imageData: small.dataUrl,
+              mimeType: small.mimeType,
+            }, 40000);
+
+            const s = data.scanned || {};
+            el('shopName').value = s.shopName || '';
+            el('billDate').value = normalizeDateToISO(s.billDate);
+            if (s.rawDateText) {
+              el('rawDateBadge').textContent = 'Printed: ' + s.rawDateText;
+              el('rawDateBadge').classList.remove('hidden');
+            } else {
+              el('rawDateBadge').classList.add('hidden');
+            }
+            el('totalAmount').value = normalizeAmount(s.totalAmount);
+            el('currency').value = normalizeCurrency(s.currency);
+            renderQuickReasons(s.suggestedReason || '');
+            el('scanStatusText').textContent = 'Scan verified · Review values and type your spending reason below';
+          } catch (err) {
+            el('scanErrorText').textContent = (err && err.message) || 'Scanning failed. Please retry or enter details manually.';
+            el('scanErrorBox').classList.remove('hidden');
+            el('scanStatusText').textContent = 'Enter details manually or click Retry Scan';
+          } finally {
+            state.isScanning = false;
+            el('submitBtn').disabled = false;
+            el('scanningOverlay').classList.add('hidden');
+            el('scanningOverlay').classList.remove('flex');
+          }
+        }
+
+        function resetForm() {
+          state.previewUrl = null;
+          el('dropZone').classList.remove('hidden');
+          el('previewContainer').classList.add('hidden');
+          el('previewContainer').classList.remove('flex');
+          el('resetBtn').classList.add('hidden');
+          el('scanErrorBox').classList.add('hidden');
+          el('saveErrorText').classList.add('hidden');
+          el('saveHelperText').classList.remove('hidden');
+          el('shopName').value = '';
+          el('billDate').value = '';
+          el('rawDateBadge').classList.add('hidden');
+          el('uploadedDate').value = '';
+          el('totalAmount').value = '';
+          el('currency').value = '₹';
+          el('spendingReason').value = '';
+          el('scanStatusText').textContent = 'Upload or capture a bill photo to auto-fill all 4 receipt fields';
+          renderQuickReasons('');
+        }
+
+        function getFilteredBills() {
+          const q = state.searchQuery.trim().toLowerCase();
+          return state.bills.filter((b) => {
+            const matchReason = state.selectedReasonFilter === 'ALL' || String(b.spendingReason || '').trim().toLowerCase() === state.selectedReasonFilter.toLowerCase();
+            if (!matchReason) return false;
+            if (!q) return true;
+            return String(b.shopName || '').toLowerCase().includes(q) || String(b.spendingReason || '').toLowerCase().includes(q) || String(b.billDate || '').toLowerCase().includes(q);
+          });
+        }
+
+        function renderDashboard() {
+          const bills = state.bills;
+          const primaryCurrency = (bills[0] && bills[0].currency) || '₹';
+          const total = bills.reduce((sum, b) => sum + Number(b.totalAmount || 0), 0);
+          const count = bills.length;
+          const avg = count > 0 ? total / count : 0;
+
+          el('kpiTotal').textContent = formatMoney(total, primaryCurrency);
+          el('kpiCount').textContent = String(count);
+          el('kpiAvg').textContent = formatMoney(avg, primaryCurrency);
+          el('kpiLatest').textContent = (bills[0] && bills[0].uploadedDate) || '—';
+
+          const breakdownCard = el('breakdownCard');
+          const breakdownGrid = el('reasonBreakdownGrid');
+          if (!state.isLoading && bills.length > 0) {
+            breakdownCard.classList.remove('hidden');
+            const groups = new Map();
+            bills.forEach((b) => {
+              const label = String(b.spendingReason || '').trim() || 'Unspecified';
+              const key = label.toLowerCase();
+              const prev = groups.get(key);
+              if (prev) { prev.total += Number(b.totalAmount || 0); prev.count += 1; }
+              else { groups.set(key, { reason: label, total: Number(b.totalAmount || 0), count: 1 }); }
+            });
+            const items = Array.from(groups.values()).sort((a, b) => b.total - a.total);
+            const maxTotal = (items[0] && items[0].total) || 1;
+            el('clearFilterBtn').classList.toggle('hidden', state.selectedReasonFilter === 'ALL');
+
+            breakdownGrid.innerHTML = items.map((item, idx) => {
+              const pct = Math.max(4, Math.round((item.total / maxTotal) * 100));
+              const selected = state.selectedReasonFilter.toLowerCase() === item.reason.toLowerCase();
+              return '<button type="button" data-reason="' + escapeHtml(item.reason) + '" class="reason-filter-btn flex flex-col gap-2 rounded-lg border p-3 text-left transition-colors ' +
+                (selected ? 'border-[#5B21B6] bg-[#F5F2FC]' : 'border-[#EDE8F8] bg-[#FAF9FC] hover:border-[#D8CEF0]') + '">' +
+                '<div class="flex w-full items-center justify-between gap-3"><span class="truncate text-sm font-semibold text-[#1E1035]">' + escapeHtml(item.reason) + '</span>' +
+                '<span class="font-mono-tabular text-sm font-bold text-[#4C1D95] shrink-0">' + formatMoney(item.total, primaryCurrency) + '</span></div>' +
+                '<div class="h-2 w-full overflow-hidden rounded-full bg-[#EDE8F8]"><div class="h-full rounded-full ' + (idx % 2 === 0 ? 'bg-[#5B21B6]' : 'bg-[#EAB308]') + '" style="width:' + pct + '%"></div></div>' +
+                '<span class="text-xs text-[#5B526E]">' + item.count + (item.count === 1 ? ' bill' : ' bills') + '</span></button>';
+            }).join('');
+
+            breakdownGrid.querySelectorAll('.reason-filter-btn').forEach((btn) => {
+              btn.addEventListener('click', () => {
+                const reason = btn.getAttribute('data-reason');
+                state.selectedReasonFilter = state.selectedReasonFilter.toLowerCase() === reason.toLowerCase() ? 'ALL' : reason;
+                renderDashboard();
+              });
+            });
+          } else {
+            breakdownCard.classList.add('hidden');
+          }
+
+          const filtered = getFilteredBills();
+          el('shownCount').textContent = '· ' + filtered.length + ' shown';
+          el('exportCsvBtn').disabled = filtered.length === 0;
+
+          const ledgerBody = el('ledgerBody');
+          if (state.loadError) {
+            ledgerBody.innerHTML = '<div class="px-6 py-12 text-center"><p class="text-sm font-medium text-[#DC2626]">' + escapeHtml(state.loadError) + '</p><button id="retryLoadBtn" type="button" class="mt-3 rounded-lg bg-[#5B21B6] px-4 py-2 text-xs font-semibold text-white">Retry</button></div>';
+            el('retryLoadBtn').onclick = loadBills;
+            return;
+          }
+          if (state.isLoading) {
+            ledgerBody.innerHTML = '<div class="px-6 py-10 text-center text-sm text-[#5B526E]">Loading bills from Google Sheet...</div>';
+            return;
+          }
+          if (bills.length === 0) {
+            ledgerBody.innerHTML = '<div class="px-6 py-14 text-center"><p class="text-base font-semibold text-[#1E1035]">No bills saved yet</p><p class="mt-1 text-sm text-[#5B526E]">Upload a receipt photo above to save it to your Google Sheet.</p></div>';
+            return;
+          }
+          if (filtered.length === 0) {
+            ledgerBody.innerHTML = '<div class="px-6 py-12 text-center"><p class="text-sm font-medium text-[#1E1035]">No matching bills found</p></div>';
+            return;
+          }
+
+          ledgerBody.innerHTML = '<div class="overflow-x-auto"><table class="w-full min-w-[740px] border-collapse text-left"><thead><tr class="border-b border-[#EDE8F8] bg-[#FAF9FC] text-xs font-semibold text-[#5B526E]"><th class="px-4 py-3">Receipt</th><th class="px-4 py-3">Shop / Company</th><th class="px-4 py-3">Bill Date</th><th class="px-4 py-3">Uploaded</th><th class="px-4 py-3">Spending Reason</th><th class="px-4 py-3 text-right">Total Amount</th><th class="px-4 py-3 text-right">Actions</th></tr></thead><tbody class="divide-y divide-[#EDE8F8] text-sm">' +
+            filtered.map((bill) => {
+              const thumb = bill.imageUrl ? '<img src="' + escapeHtml(bill.imageUrl) + '" referrerpolicy="no-referrer" class="h-full w-full object-cover" />' : '<span class="text-xs font-semibold text-[#5B21B6]">View</span>';
+              const isEditing = state.editingId === bill.id;
+              const isDeleting = state.confirmDeleteId === bill.id;
+              const reasonCell = isEditing
+                ? '<div class="flex items-center gap-2"><input id="editInput-' + escapeHtml(bill.id) + '" type="text" value="' + escapeHtml(bill.spendingReason) + '" class="min-h-[34px] w-full max-w-[200px] rounded-md border border-[#5B21B6] px-2.5 py-1 text-xs" /><button data-save-edit="' + escapeHtml(bill.id) + '" type="button" class="rounded-md bg-[#5B21B6] px-2.5 py-1 text-xs font-semibold text-white">Save</button><button data-cancel-edit="1" type="button" class="text-xs text-[#5B526E]">Cancel</button></div>'
+                : '<div class="flex items-center gap-2"><span>' + escapeHtml(bill.spendingReason) + '</span><button data-start-edit="' + escapeHtml(bill.id) + '" type="button" class="text-xs font-semibold text-[#5B21B6] hover:underline">Edit</button></div>';
+              const actionCell = isDeleting
+                ? '<div class="inline-flex items-center gap-2"><button data-confirm-del="' + escapeHtml(bill.id) + '" type="button" class="rounded-md bg-[#DC2626] px-2.5 py-1 text-xs font-semibold text-white">Confirm</button><button data-cancel-del="1" type="button" class="text-xs text-[#5B526E]">Cancel</button></div>'
+                : '<div class="inline-flex items-center gap-2"><button data-preview="' + escapeHtml(bill.id) + '" type="button" class="text-xs font-semibold text-[#5B21B6] hover:underline">Inspect</button><button data-ask-del="' + escapeHtml(bill.id) + '" type="button" class="text-xs font-semibold text-[#DC2626] hover:underline">Delete</button></div>';
+
+              return '<tr class="hover:bg-[#FAF9FC]"><td class="px-4 py-3"><button data-preview="' + escapeHtml(bill.id) + '" type="button" class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-[#D8CEF0] bg-[#F5F2FC]">' + thumb + '</button></td><td class="px-4 py-3 font-semibold text-[#1E1035]">' + escapeHtml(bill.shopName) + '</td><td class="font-mono-tabular px-4 py-3 text-xs text-[#3B2863]">' + escapeHtml(bill.billDate) + '</td><td class="font-mono-tabular px-4 py-3 text-xs text-[#5B526E]">' + escapeHtml(bill.uploadedDate) + '</td><td class="px-4 py-3">' + reasonCell + '</td><td class="font-mono-tabular px-4 py-3 text-right font-bold text-[#4C1D95]">' + formatMoney(bill.totalAmount, bill.currency) + '</td><td class="px-4 py-3 text-right">' + actionCell + '</td></tr>';
+            }).join('') + '</tbody></table></div>';
+
+          ledgerBody.querySelectorAll('[data-preview]').forEach((btn) => btn.addEventListener('click', () => {
+            const bill = state.bills.find((b) => b.id === btn.getAttribute('data-preview'));
+            if (bill) openPreviewModal(bill);
+          }));
+          ledgerBody.querySelectorAll('[data-start-edit]').forEach((btn) => btn.addEventListener('click', () => { state.editingId = btn.getAttribute('data-start-edit'); renderDashboard(); }));
+          ledgerBody.querySelectorAll('[data-cancel-edit]').forEach((btn) => btn.addEventListener('click', () => { state.editingId = null; renderDashboard(); }));
+          ledgerBody.querySelectorAll('[data-save-edit]').forEach((btn) => btn.addEventListener('click', async () => {
+            const id = btn.getAttribute('data-save-edit');
+            const input = el('editInput-' + id);
+            const nextReason = input ? input.value.trim() : '';
+            if (!nextReason) return;
+            btn.disabled = true;
+            try {
+              const res = await callAppsScriptPost({ action: 'updateReason', id, spendingReason: nextReason });
+              if (res.bill) state.bills = state.bills.map((b) => (b.id === id ? res.bill : b));
+              state.editingId = null;
+              renderDashboard();
+            } catch (err) {
+              state.loadError = err.message || 'Failed to update reason.';
+              state.editingId = null;
+              renderDashboard();
+            }
+          }));
+          ledgerBody.querySelectorAll('[data-ask-del]').forEach((btn) => btn.addEventListener('click', () => { state.confirmDeleteId = btn.getAttribute('data-ask-del'); renderDashboard(); }));
+          ledgerBody.querySelectorAll('[data-cancel-del]').forEach((btn) => btn.addEventListener('click', () => { state.confirmDeleteId = null; renderDashboard(); }));
+          ledgerBody.querySelectorAll('[data-confirm-del]').forEach((btn) => btn.addEventListener('click', async () => {
+            const id = btn.getAttribute('data-confirm-del');
+            btn.disabled = true;
+            try {
+              await callAppsScriptPost({ action: 'deleteBill', id });
+              state.bills = state.bills.filter((b) => b.id !== id);
+              state.confirmDeleteId = null;
+              renderDashboard();
+            } catch (err) {
+              state.loadError = err.message || 'Failed to delete bill.';
+              state.confirmDeleteId = null;
+              renderDashboard();
+            }
+          }));
+        }
+
+        function openPreviewModal(bill) {
+          el('modalShopName').textContent = bill.shopName;
+          el('modalShopCopy').textContent = bill.shopName;
+          el('modalDates').textContent = 'Bill Date: ' + bill.billDate + ' · Uploaded: ' + bill.uploadedDate;
+          el('modalAmount').textContent = formatMoney(bill.totalAmount, bill.currency);
+          el('modalReason').textContent = bill.spendingReason;
+          if (bill.imageUrl) { el('modalImage').src = bill.imageUrl; el('modalImage').classList.remove('hidden'); }
+          else { el('modalImage').classList.add('hidden'); }
+          el('previewModal').classList.remove('hidden');
+        }
+
+        async function loadBills() {
+          state.isLoading = true;
+          state.loadError = null;
+          renderDashboard();
+          try {
+            const data = await callAppsScriptPost({ action: 'list' });
+            state.bills = Array.isArray(data.bills) ? data.bills : [];
+          } catch (err) {
+            state.loadError = err.message || 'Could not load bills from Google Sheet.';
+          } finally {
+            state.isLoading = false;
+            renderDashboard();
+          }
+        }
+
+        async function startCamera() {
+          el('cameraErrorText').classList.add('hidden');
+          el('snapCameraBtn').disabled = true;
+          stopCamera();
+
+          if (!window.isSecureContext) {
+            el('cameraErrorText').textContent = 'Live camera requires HTTPS. Tap "Device Camera" below or host on HTTPS.';
+            el('cameraErrorText').classList.remove('hidden');
+            return;
+          }
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            el('cameraErrorText').textContent = 'Live camera preview unavailable. Tap "Device Camera" below.';
+            el('cameraErrorText').classList.remove('hidden');
+            return;
+          }
+          try {
+            let stream;
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: state.facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+            } catch (e1) {
+              try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: state.facingMode } }, audio: false });
+              } catch (e2) {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+              }
+            }
+            state.cameraStream = stream;
+            const video = el('cameraVideo');
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+              video.play().catch(() => {});
+              el('snapCameraBtn').disabled = false;
+            };
+          } catch (err) {
+            const name = err && err.name ? err.name : '';
+            let msg = 'Could not access camera. Tap "Device Camera" or upload from gallery.';
+            if (name === 'NotAllowedError') msg = 'Camera permission denied. Allow permission or tap "Device Camera".';
+            else if (name === 'NotFoundError') msg = 'No camera detected. Tap "Device Camera" or upload from gallery.';
+            else if (name === 'NotReadableError') msg = 'Camera is in use by another app.';
+            el('cameraErrorText').textContent = msg;
+            el('cameraErrorText').classList.remove('hidden');
+          }
+        }
+
+        function stopCamera() {
+          if (state.cameraStream) {
+            state.cameraStream.getTracks().forEach((t) => t.stop());
+            state.cameraStream = null;
+          }
+        }
+
+        el('navUploadBtn').onclick = () => el('fileInput').click();
+        el('chooseGalleryBtn').onclick = () => el('fileInput').click();
+        el('chooseAnotherBtn').onclick = () => el('fileInput').click();
+        el('deviceCameraBtn').onclick = () => el('nativeCameraInput').click();
+        el('resetBtn').onclick = resetForm;
+        el('dismissNoticeBtn').onclick = () => el('savedNotice').classList.add('hidden');
+        el('retryScanBtn').onclick = () => state.previewUrl && processAndScan(state.previewUrl);
+        el('refreshBillsBtn').onclick = loadBills;
+        el('clearFilterBtn').onclick = () => { state.selectedReasonFilter = 'ALL'; renderDashboard(); };
+        el('searchInput').oninput = (e) => { state.searchQuery = e.target.value; renderDashboard(); };
+        el('closePreviewBtn').onclick = () => el('previewModal').classList.add('hidden');
+        el('donePreviewBtn').onclick = () => el('previewModal').classList.add('hidden');
+        el('openCameraBtn').onclick = () => { el('cameraModal').classList.remove('hidden'); startCamera(); };
+        el('retakePhotoBtn').onclick = () => { el('cameraModal').classList.remove('hidden'); startCamera(); };
+        el('closeCameraBtn').onclick = () => { stopCamera(); el('cameraModal').classList.add('hidden'); };
+        el('cancelCameraBtn').onclick = () => { stopCamera(); el('cameraModal').classList.add('hidden'); };
+        el('switchCameraBtn').onclick = () => { state.facingMode = state.facingMode === 'environment' ? 'user' : 'environment'; startCamera(); };
+
+        el('snapCameraBtn').onclick = () => {
+          const video = el('cameraVideo');
+          if (!video || !video.videoWidth) return;
+          const w0 = video.videoWidth, h0 = video.videoHeight;
+          const shortSide = Math.min(w0, h0), longSide = Math.max(w0, h0);
+          let scale = 1;
+          if (shortSide > 1150) scale = 1150 / shortSide;
+          if (longSide * scale > 2200) scale = 2200 / longSide;
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(w0 * scale));
+          canvas.height = Math.max(1, Math.round(h0 * scale));
+          canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+          stopCamera();
+          el('cameraModal').classList.add('hidden');
+          processAndScan(dataUrl);
+        };
+
+        el('fileInput').onchange = (e) => { const file = e.target.files && e.target.files[0]; if (file) processAndScan(file); e.target.value = ''; };
+        el('nativeCameraInput').onchange = (e) => {
+          const file = e.target.files && e.target.files[0];
+          e.target.value = '';
+          if (file) { stopCamera(); el('cameraModal').classList.add('hidden'); processAndScan(file); }
+        };
+
+        el('dropZone').ondragover = (e) => e.preventDefault();
+        el('dropZone').ondrop = (e) => {
+          e.preventDefault();
+          const file = e.dataTransfer.files && e.dataTransfer.files[0];
+          if (file && file.type.startsWith('image/')) processAndScan(file);
+        };
+
+        el('exportCsvBtn').onclick = () => {
+          const filtered = getFilteredBills();
+          if (!filtered.length) return;
+          const headers = ['Shop Name', 'Bill Date', 'Uploaded Date', 'Spending Reason', 'Currency', 'Total Amount'];
+          const rows = filtered.map((b) => ['"' + String(b.shopName || '').replaceAll('"', '""') + '"', b.billDate, b.uploadedDate, '"' + String(b.spendingReason || '').replaceAll('"', '""') + '"', b.currency, Number(b.totalAmount || 0).toFixed(2)]);
+          const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'billtrack-expenses-' + todayString() + '.csv';
+          a.click();
+          URL.revokeObjectURL(url);
+        };
+
+        el('billForm').onsubmit = async (e) => {
+          e.preventDefault();
+          const shopName = el('shopName').value.trim();
+          const totalAmount = el('totalAmount').value.trim();
+          const spendingReason = el('spendingReason').value.trim();
+          const errEl = el('saveErrorText');
+          const helpEl = el('saveHelperText');
+          errEl.classList.add('hidden');
+          helpEl.classList.remove('hidden');
+
+          if (!shopName) { errEl.textContent = 'Please enter or verify the Shop / Company Name.'; errEl.classList.remove('hidden'); helpEl.classList.add('hidden'); return; }
+          if (!totalAmount || Number.isNaN(Number(totalAmount)) || Number(totalAmount) < 0) { errEl.textContent = 'Please enter a valid Total Amount.'; errEl.classList.remove('hidden'); helpEl.classList.add('hidden'); return; }
+          if (!spendingReason) { errEl.textContent = 'Please enter your Spending Reason before saving.'; errEl.classList.remove('hidden'); helpEl.classList.add('hidden'); return; }
+
+          el('submitBtn').disabled = true;
+          el('submitBtn').textContent = 'Saving to Google Sheet...';
+          try {
+            const data = await callAppsScriptPost({
+              action: 'saveBill',
+              shopName,
+              billDate: el('billDate').value.trim() || todayString(),
+              uploadedDate: el('uploadedDate').value || todayString(),
+              totalAmount: Number(totalAmount),
+              currency: el('currency').value || '₹',
+              spendingReason,
+              imageData: state.previewUrl,
+              mimeType: state.imageMimeType,
+            });
+            if (data.bill) { state.bills.unshift(data.bill); renderDashboard(); }
+            resetForm();
+            el('savedNoticeText').textContent = 'Saved "' + shopName + '" to your Google Sheet & Dashboard.';
+            el('savedNotice').classList.remove('hidden');
+          } catch (err) {
+            errEl.textContent = err.message || 'Unable to save bill.';
+            errEl.classList.remove('hidden');
+            helpEl.classList.add('hidden');
+          } finally {
+            el('submitBtn').disabled = false;
+            el('submitBtn').textContent = 'Submit & Save Bill';
+          }
+        };
+
+
+        /* ---------- email sign-in ---------- */
+        let pendingEmail = '';
+        let resendTimer = null;
+
+        function authMsg(text, kind) {
+          const m = el('authMsg');
+          if (!text) { m.classList.add('hidden'); return; }
+          m.textContent = text;
+          m.className = 'mt-4 rounded-lg px-3 py-2 text-sm ' + (kind === 'info'
+            ? 'bg-[#F3E8FF] text-[#5B21B6]' : 'bg-[#FEF2F2] text-[#B91C1C]');
+        }
+
+        function authShow(step) {
+          el('authOverlay').style.display = 'flex';
+          document.body.style.overflow = 'hidden';
+          el('authEmailForm').style.display = step === 'email' ? 'block' : 'none';
+          el('authCodeForm').style.display = step === 'code' ? 'block' : 'none';
+          el('authTitle').textContent = step === 'email' ? 'Sign in to BillTrack' : 'Enter your code';
+          el('authSub').textContent = step === 'email'
+            ? 'Enter your email and we will send you a 6-digit sign-in code.'
+            : 'We sent a 6-digit code to ' + pendingEmail + '. It is valid for 10 minutes.';
+          setTimeout(() => el(step === 'email' ? 'authEmail' : 'authCode').focus(), 50);
+        }
+
+        function startResendCooldown() {
+          let left = 45;
+          const btn = el('authResendBtn');
+          btn.disabled = true;
+          clearInterval(resendTimer);
+          btn.textContent = 'Resend code (' + left + 's)';
+          resendTimer = setInterval(() => {
+            left -= 1;
+            if (left <= 0) { clearInterval(resendTimer); btn.disabled = false; btn.textContent = 'Resend code'; }
+            else btn.textContent = 'Resend code (' + left + 's)';
+          }, 1000);
+        }
+
+        async function sendCode(email, isResend) {
+          const btn = el('authSendBtn');
+          btn.disabled = true;
+          btn.textContent = 'Sending...';
+          authMsg('');
+          try {
+            await callAppsScriptPost({ action: 'requestOtp', email }, 30000);
+            pendingEmail = email;
+            authShow('code');
+            el('authCode').value = '';
+            startResendCooldown();
+            if (isResend) authMsg('A new code has been sent.', 'info');
+          } catch (err) {
+            authMsg(err.message || 'Could not send the code. Please try again.');
+          } finally {
+            btn.disabled = false;
+            btn.textContent = 'Send sign-in code';
+          }
+        }
+
+        el('authEmailForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const email = el('authEmail').value.trim().toLowerCase();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { authMsg('Please enter a valid email address.'); return; }
+          sendCode(email, false);
+        });
+
+        el('authCodeForm').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const code = el('authCode').value.replace(/\D/g, '');
+          if (code.length !== 6) { authMsg('Please enter the 6-digit code.'); return; }
+          const btn = el('authVerifyBtn');
+          btn.disabled = true;
+          btn.textContent = 'Verifying...';
+          authMsg('');
+          try {
+            const data = await callAppsScriptPost({ action: 'verifyOtp', email: pendingEmail, code }, 30000);
+            saveSession({ token: data.token, email: data.email, expiresAt: data.expiresAt });
+            location.reload();
+          } catch (err) {
+            authMsg(err.message || 'Could not verify the code.');
+            btn.disabled = false;
+            btn.textContent = 'Verify & sign in';
+          }
+        });
+
+        el('authCode').addEventListener('input', () => { el('authCode').value = el('authCode').value.replace(/\D/g, '').slice(0, 6); });
+        el('authBackBtn').onclick = () => { clearInterval(resendTimer); authMsg(''); authShow('email'); };
+        el('authResendBtn').onclick = () => sendCode(pendingEmail, true);
+        el('signOutBtn').onclick = forceSignOut;
+
+        renderQuickReasons('');
+        if (session && session.token) {
+          el('userEmail').textContent = session.email;
+          loadBills();
+        } else {
+          authShow('email');
+        }
+      })();
+    </script>
+  </body>
+</html>
